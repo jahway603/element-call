@@ -38,10 +38,16 @@ export interface SpotlightExpandedLayoutMedia {
   pip?: UserMediaViewModel;
 }
 
-export interface OneOnOneLayoutMedia {
-  type: "one-on-one";
+export interface OneOnOneLandscapeLayoutMedia {
+  type: "one-on-one-landscape";
   spotlight: UserMediaViewModel;
   pip: LocalUserMediaViewModel | RingingMediaViewModel;
+}
+
+export interface OneOnOnePortraitLayoutMedia {
+  type: "one-on-one-portrait";
+  spotlight: UserMediaViewModel | RingingMediaViewModel;
+  pip?: LocalUserMediaViewModel;
 }
 
 export interface PipLayoutMedia {
@@ -54,7 +60,8 @@ export type LayoutMedia =
   | SpotlightLandscapeLayoutMedia
   | SpotlightPortraitLayoutMedia
   | SpotlightExpandedLayoutMedia
-  | OneOnOneLayoutMedia
+  | OneOnOneLandscapeLayoutMedia
+  | OneOnOnePortraitLayoutMedia
   | PipLayoutMedia;
 
 export interface GridLayout {
@@ -84,10 +91,16 @@ export interface SpotlightExpandedLayout {
   pip?: GridTileViewModel;
 }
 
-export interface OneOnOneLayout {
-  type: "one-on-one";
+export interface OneOnOneLandscapeLayout {
+  type: "one-on-one-landscape";
   spotlight: GridTileViewModel;
   pip: GridTileViewModel;
+}
+
+export interface OneOnOnePortraitLayout {
+  type: "one-on-one-portrait";
+  spotlight: GridTileViewModel;
+  pip?: GridTileViewModel;
 }
 
 export interface PipLayout {
@@ -104,5 +117,6 @@ export type Layout =
   | SpotlightLandscapeLayout
   | SpotlightPortraitLayout
   | SpotlightExpandedLayout
-  | OneOnOneLayout
+  | OneOnOneLandscapeLayout
+  | OneOnOnePortraitLayout
   | PipLayout;

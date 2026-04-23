@@ -22,6 +22,7 @@ export class GridTileViewModel {
     public readonly media$: Behavior<
       UserMediaViewModel | RingingMediaViewModel
     >,
+    public readonly showNameTag$: Behavior<boolean>,
   ) {}
 }
 

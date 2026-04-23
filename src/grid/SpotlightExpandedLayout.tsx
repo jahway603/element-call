@@ -19,7 +19,7 @@ import { useBehavior } from "../useBehavior";
  */
 export const makeSpotlightExpandedLayout: CallLayout<
   SpotlightExpandedLayoutModel
-> = ({ pipAlignment$ }) => ({
+> = ({ landscapePipAlignment$ }) => ({
   scrollingOnTop: true,
 
   fixed: function SpotlightExpandedLayoutFixed({
@@ -46,11 +46,11 @@ export const makeSpotlightExpandedLayout: CallLayout<
     Slot,
   }): ReactNode {
     useUpdateLayout();
-    const pipAlignmentValue = useBehavior(pipAlignment$);
+    const pipAlignmentValue = useBehavior(landscapePipAlignment$);
 
     const onDragPip: DragCallback = useCallback(
       ({ xRatio, yRatio }) =>
-        pipAlignment$.next({
+        landscapePipAlignment$.next({
           block: yRatio < 0.5 ? "start" : "end",
           inline: xRatio < 0.5 ? "start" : "end",
         }),

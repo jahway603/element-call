@@ -68,7 +68,8 @@ import { setPipEnabled$ } from "../../controls";
 import { TileStore } from "../TileStore";
 import { gridLikeLayout } from "../GridLikeLayout";
 import { spotlightExpandedLayout } from "../SpotlightExpandedLayout";
-import { oneOnOneLayout } from "../OneOnOneLayout";
+import { oneOnOneLandscapeLayout } from "../OneOnOneLandscapeLayout";
+import { oneOnOnePortraitLayout } from "../OneOnOnePortraitLayout";
 import { pipLayout } from "../PipLayout";
 import { type EncryptionSystem } from "../../e2ee/sharedKeyManagement";
 import {
@@ -89,7 +90,8 @@ import {
   type GridLayoutMedia,
   type Layout,
   type LayoutMedia,
-  type OneOnOneLayoutMedia,
+  type OneOnOneLandscapeLayoutMedia,
+  type OneOnOnePortraitLayoutMedia,
   type SpotlightExpandedLayoutMedia,
   type SpotlightLandscapeLayoutMedia,
   type SpotlightPortraitLayoutMedia,
@@ -1090,50 +1092,76 @@ export function createCallViewModel$(
       ),
     );
 
-  const oneOnOneLayoutMedia$: Observable<OneOnOneLayoutMedia | null> =
-    combineLatest([userMedia$, screenShares$]).pipe(
-      switchMap(([userMedia, screenShares]) => {
-        // One-on-one layout only supports 2 user media, no screen shares
-        if (userMedia.length <= 2 && screenShares.length === 0) {
-          const local = userMedia.find(
-            (vm): vm is WrappedUserMediaViewModel & LocalUserMediaViewModel =>
-              vm.type === "user" && vm.local,
+  const oneOnOneLayoutMedia$: Observable<{
+    local: LocalUserMediaViewModel;
+    remote: UserMediaViewModel | RingingMediaViewModel;
+  } | null> = combineLatest([userMedia$, screenShares$]).pipe(
+    switchMap(([userMedia, screenShares]) => {
+      // One-on-one layout only supports 2 user media, no screen shares
+      if (userMedia.length <= 2 && screenShares.length === 0) {
+        const local = userMedia.find(
+          (vm): vm is WrappedUserMediaViewModel & LocalUserMediaViewModel =>
+            vm.type === "user" && vm.local,
+        );
+
+        if (local !== undefined) {
+          const remote = userMedia.find(
+            (vm): vm is WrappedUserMediaViewModel & RemoteUserMediaViewModel =>
+              vm.type === "user" && !vm.local,
           );
 
-          if (local !== undefined) {
-            const remote = userMedia.find(
-              (
-                vm,
-              ): vm is WrappedUserMediaViewModel & RemoteUserMediaViewModel =>
-                vm.type === "user" && !vm.local,
+          if (remote !== undefined) return of({ local, remote });
+
+          // If there's no other user media in the call (could still happen in
+          // this branch due to the duplicate tiles option), we could possibly
+          // show ringing media instead
+          if (userMedia.length === 1)
+            return ringingMedia$.pipe(
+              map((ringingMedia) => {
+                return ringingMedia.length === 1
+                  ? {
+                      local,
+                      remote: ringingMedia[0],
+                    }
+                  : null;
+              }),
             );
-
-            if (remote !== undefined)
-              return of({
-                type: "one-on-one" as const,
-                spotlight: remote,
-                pip: local,
-              });
-
-            // If there's no other user media in the call (could still happen in
-            // this branch due to the duplicate tiles option), we could possibly
-            // show ringing media instead
-            if (userMedia.length === 1)
-              return ringingMedia$.pipe(
-                map((ringingMedia) => {
-                  return ringingMedia.length === 1
-                    ? {
-                        type: "one-on-one" as const,
-                        spotlight: local,
-                        pip: ringingMedia[0],
-                      }
-                    : null;
-                }),
-              );
-          }
         }
+      }
 
-        return of(null);
+      return of(null);
+    }),
+  );
+
+  const oneOnOneLandscapeLayoutMedia$: Observable<OneOnOneLandscapeLayoutMedia | null> =
+    oneOnOneLayoutMedia$.pipe(
+      map((media) => {
+        if (media === null) return null;
+        return media.remote.type === "ringing"
+          ? {
+              type: "one-on-one-landscape" as const,
+              spotlight: media.local,
+              pip: media.remote,
+            }
+          : {
+              type: "one-on-one-landscape" as const,
+              spotlight: media.remote,
+              pip: media.local,
+            };
+      }),
+    );
+
+  const oneOnOnePortraitLayoutMedia$: Observable<OneOnOnePortraitLayoutMedia | null> =
+    oneOnOneLayoutMedia$.pipe(
+      switchMap((media) => {
+        if (media === null) return of(null);
+        return media.local.videoEnabled$.pipe(
+          map((videoEnabled) => ({
+            type: "one-on-one-portrait" as const,
+            spotlight: media.remote,
+            pip: videoEnabled ? media.local : undefined,
+          })),
+        );
       }),
     );
 
@@ -1153,7 +1181,7 @@ export function createCallViewModel$(
               switchMap((gridMode) => {
                 switch (gridMode) {
                   case "grid":
-                    return oneOnOneLayoutMedia$.pipe(
+                    return oneOnOneLandscapeLayoutMedia$.pipe(
                       switchMap((oneOnOne) =>
                         oneOnOne === null ? gridLayoutMedia$ : of(oneOnOne),
                       ),
@@ -1170,7 +1198,7 @@ export function createCallViewModel$(
               }),
             );
           case "narrow":
-            return oneOnOneLayoutMedia$.pipe(
+            return oneOnOnePortraitLayoutMedia$.pipe(
               switchMap((oneOnOne) =>
                 oneOnOne === null
                   ? combineLatest([grid$, spotlight$], (grid, spotlight) =>
@@ -1179,9 +1207,7 @@ export function createCallViewModel$(
                         ? spotlightPortraitLayoutMedia$
                         : gridLayoutMedia$,
                     ).pipe(switchAll())
-                  : // The expanded spotlight layout makes for a better one-on-one
-                    // experience in narrow windows
-                    spotlightExpandedLayoutMedia$,
+                  : of(oneOnOne),
               ),
             );
           case "flat":
@@ -1238,8 +1264,11 @@ export function createCallViewModel$(
             case "spotlight-expanded":
               [layout, newTiles] = spotlightExpandedLayout(media, prevTiles);
               break;
-            case "one-on-one":
-              [layout, newTiles] = oneOnOneLayout(media, prevTiles);
+            case "one-on-one-landscape":
+              [layout, newTiles] = oneOnOneLandscapeLayout(media, prevTiles);
+              break;
+            case "one-on-one-portrait":
+              [layout, newTiles] = oneOnOnePortraitLayout(media, prevTiles);
               break;
             case "pip":
               [layout, newTiles] = pipLayout(media, prevTiles);
@@ -1290,7 +1319,8 @@ export function createCallViewModel$(
           // indicators. And in one-on-one layout there's no question as to who is
           // speaking.
           case "spotlight-expanded":
-          case "one-on-one":
+          case "one-on-one-landscape":
+          case "one-on-one-portrait":
             return of(false);
           default:
             return of(true);

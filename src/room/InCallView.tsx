@@ -53,10 +53,12 @@ import { E2eeType } from "../e2ee/e2eeType";
 import { makeGridLayout } from "../grid/GridLayout";
 import {
   type CallLayoutOutputs,
-  defaultPipAlignment,
   defaultSpotlightAlignment,
+  defaultPortraitPipAlignment,
+  defaultLandscapePipAlignment,
 } from "../grid/CallLayout";
-import { makeOneOnOneLayout } from "../grid/OneOnOneLayout";
+import { makeOneOnOneLandscapeLayout } from "../grid/OneOnOneLandscapeLayout";
+import { makeOneOnOnePortraitLayout } from "../grid/OneOnOnePortraitLayout";
 import { makeSpotlightExpandedLayout } from "../grid/SpotlightExpandedLayout";
 import { makeSpotlightLandscapeLayout } from "../grid/SpotlightLandscapeLayout";
 import { makeSpotlightPortraitLayout } from "../grid/SpotlightPortraitLayout";
@@ -347,8 +349,11 @@ export const InCallView: FC<InCallViewProps> = ({
   const spotlightAlignment$ = useInitial(
     () => new BehaviorSubject(defaultSpotlightAlignment),
   );
-  const pipAlignment$ = useInitial(
-    () => new BehaviorSubject(defaultPipAlignment),
+  const portraitPipAlignment$ = useInitial(
+    () => new BehaviorSubject(defaultPortraitPipAlignment),
+  );
+  const landscapePipAlignment$ = useInitial(
+    () => new BehaviorSubject(defaultLandscapePipAlignment),
   );
 
   const setGridMode = useCallback(
@@ -489,16 +494,23 @@ export const InCallView: FC<InCallViewProps> = ({
     const inputs = {
       minBounds$: gridBoundsObservable$,
       spotlightAlignment$,
-      pipAlignment$,
+      portraitPipAlignment$,
+      landscapePipAlignment$,
     };
     return {
       grid: makeGridLayout(inputs),
       "spotlight-landscape": makeSpotlightLandscapeLayout(inputs),
       "spotlight-portrait": makeSpotlightPortraitLayout(inputs),
       "spotlight-expanded": makeSpotlightExpandedLayout(inputs),
-      "one-on-one": makeOneOnOneLayout(inputs),
+      "one-on-one-landscape": makeOneOnOneLandscapeLayout(inputs),
+      "one-on-one-portrait": makeOneOnOnePortraitLayout(inputs),
     };
-  }, [gridBoundsObservable$, spotlightAlignment$, pipAlignment$]);
+  }, [
+    gridBoundsObservable$,
+    spotlightAlignment$,
+    portraitPipAlignment$,
+    landscapePipAlignment$,
+  ]);
 
   const renderContent = (): JSX.Element => {
     if (layout.type === "pip") {

@@ -1,20 +1,24 @@
 /*
 Copyright 2024 New Vector Ltd.
+Copyright 2026 Element Creations Ltd.
 
 SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE in the repository root for full details.
 */
 
-import { type OneOnOneLayout, type OneOnOneLayoutMedia } from "./layout-types";
+import {
+  type OneOnOneLandscapeLayout,
+  type OneOnOneLandscapeLayoutMedia,
+} from "./layout-types";
 import { type TileStore } from "./TileStore";
 
 /**
- * Produces a one-on-one layout with the given media.
+ * Produces a one-on-one landscape layout with the given media.
  */
-export function oneOnOneLayout(
-  media: OneOnOneLayoutMedia,
+export function oneOnOneLandscapeLayout(
+  media: OneOnOneLandscapeLayoutMedia,
   prevTiles: TileStore,
-): [OneOnOneLayout, TileStore] {
+): [OneOnOneLandscapeLayout, TileStore] {
   const update = prevTiles.from(2);
   update.registerGridTile(media.pip);
   update.registerGridTile(media.spotlight);

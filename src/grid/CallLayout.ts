@@ -25,7 +25,14 @@ export const defaultSpotlightAlignment: Alignment = {
   inline: "end",
   block: "end",
 };
-export const defaultPipAlignment: Alignment = { inline: "end", block: "start" };
+export const defaultPortraitPipAlignment: Alignment = {
+  inline: "end",
+  block: "end",
+};
+export const defaultLandscapePipAlignment: Alignment = {
+  inline: "end",
+  block: "start",
+};
 
 export interface CallLayoutInputs {
   /**
@@ -37,9 +44,13 @@ export interface CallLayoutInputs {
    */
   spotlightAlignment$: BehaviorSubject<Alignment>;
   /**
-   * The alignment of the small picture-in-picture tile, if present.
+   * The alignment of the small picture-in-picture tile, if present, when in portrait.
    */
-  pipAlignment$: BehaviorSubject<Alignment>;
+  portraitPipAlignment$: BehaviorSubject<Alignment>;
+  /**
+   * The alignment of the small picture-in-picture tile, if present, when in landscape.
+   */
+  landscapePipAlignment$: BehaviorSubject<Alignment>;
 }
 
 export interface CallLayoutOutputs<Model> {
