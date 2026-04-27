@@ -38,6 +38,7 @@ import {
   tap,
   throttleTime,
   timer,
+  BehaviorSubject,
 } from "rxjs";
 import { logger as rootLogger } from "matrix-js-sdk/lib/logger";
 import {
@@ -87,6 +88,7 @@ import { getUrlParams, HeaderStyle } from "../../UrlParams";
 import { type ProcessorState } from "../../livekit/TrackProcessorContext";
 import { ElementWidgetActions, widget } from "../../widget";
 import {
+  type Alignment,
   type GridLayoutMedia,
   type Layout,
   type LayoutMedia,
@@ -329,16 +331,6 @@ export interface CallViewModel {
     { sender: string; emoji: string; startX: number }[]
   >;
 
-  // window/layout
-  /**
-   * The general shape of the window.
-   */
-  windowMode$: Behavior<WindowMode>;
-  spotlightExpanded$: Behavior<boolean>;
-  toggleSpotlightExpanded$: Behavior<(() => void) | null>;
-  gridMode$: Behavior<GridMode>;
-  setGridMode: (value: GridMode) => void;
-
   /**
    * The layout of tiles in the call interface.
    */
@@ -349,10 +341,19 @@ export interface CallViewModel {
   tileStoreGeneration$: Behavior<number>;
   showSpotlightIndicators$: Behavior<boolean>;
   showSpeakingIndicators$: Behavior<boolean>;
+  spotlightExpanded$: Behavior<boolean>;
+  toggleSpotlightExpanded$: Behavior<(() => void) | null>;
+  gridMode$: Behavior<GridMode>;
+  setGridMode: (value: GridMode) => void;
 
   // header/footer visibility
   showHeader$: Behavior<boolean>;
   showFooter$: Behavior<boolean>;
+  /**
+   * Whether the call layout should be displayed edge-to-edge, with the footer
+   * and header as overlays.
+   */
+  edgeToEdge$: Behavior<boolean>;
 
   // audio routing
   /**
@@ -1058,6 +1059,7 @@ export function createCallViewModel$(
     [grid$, spotlight$],
     (grid, spotlight) => ({
       type: "grid",
+      edgeToEdge: false,
       spotlight: spotlight.some((vm) => vm.type === "screen share")
         ? spotlight
         : undefined,
@@ -1068,6 +1070,7 @@ export function createCallViewModel$(
   const spotlightLandscapeLayoutMedia$: Observable<SpotlightLandscapeLayoutMedia> =
     combineLatest([grid$, spotlight$], (grid, spotlight) => ({
       type: "spotlight-landscape",
+      edgeToEdge: false,
       spotlight,
       grid,
     }));
@@ -1075,16 +1078,20 @@ export function createCallViewModel$(
   const spotlightPortraitLayoutMedia$: Observable<SpotlightPortraitLayoutMedia> =
     combineLatest([grid$, spotlight$], (grid, spotlight) => ({
       type: "spotlight-portrait",
+      edgeToEdge: false,
       spotlight,
       grid,
     }));
 
-  const spotlightExpandedLayoutMedia$: Observable<SpotlightExpandedLayoutMedia> =
+  const spotlightExpandedLayoutMedia$ = (
+    edgeToEdge: boolean,
+  ): Observable<SpotlightExpandedLayoutMedia> =>
     spotlightAndPip$.pipe(
       switchMap(({ spotlight, pip$ }) =>
         pip$.pipe(
           map((pip) => ({
             type: "spotlight-expanded" as const,
+            edgeToEdge,
             spotlight,
             pip: pip ?? undefined,
           })),
@@ -1140,11 +1147,13 @@ export function createCallViewModel$(
         return media.remote.type === "ringing"
           ? {
               type: "one-on-one-landscape" as const,
+              edgeToEdge: false,
               spotlight: media.local,
               pip: media.remote,
             }
           : {
               type: "one-on-one-landscape" as const,
+              edgeToEdge: false,
               spotlight: media.remote,
               pip: media.local,
             };
@@ -1158,6 +1167,7 @@ export function createCallViewModel$(
         return media.local.videoEnabled$.pipe(
           map((videoEnabled) => ({
             type: "one-on-one-portrait" as const,
+            edgeToEdge: true as const,
             spotlight: media.remote,
             pip: videoEnabled ? media.local : undefined,
           })),
@@ -1166,7 +1176,11 @@ export function createCallViewModel$(
     );
 
   const pipLayoutMedia$: Observable<LayoutMedia> = spotlight$.pipe(
-    map((spotlight) => ({ type: "pip", spotlight })),
+    map((spotlight) => ({
+      type: "pip",
+      edgeToEdge: platform !== "desktop",
+      spotlight,
+    })),
   );
 
   /**
@@ -1190,7 +1204,7 @@ export function createCallViewModel$(
                     return spotlightExpanded$.pipe(
                       switchMap((expanded) =>
                         expanded
-                          ? spotlightExpandedLayoutMedia$
+                          ? spotlightExpandedLayoutMedia$(false)
                           : spotlightLandscapeLayoutMedia$,
                       ),
                     );
@@ -1219,7 +1233,7 @@ export function createCallViewModel$(
                     // this window mode.
                     return spotlightLandscapeLayoutMedia$;
                   case "spotlight":
-                    return spotlightExpandedLayoutMedia$;
+                    return spotlightExpandedLayoutMedia$(true);
                 }
               }),
             );
@@ -1229,6 +1243,170 @@ export function createCallViewModel$(
       }),
     ),
   );
+
+  const showSpotlightIndicators$ = scope.behavior<boolean>(
+    layoutMedia$.pipe(map((l) => l.type !== "grid")),
+  );
+
+  const showSpeakingIndicators$ = scope.behavior<boolean>(
+    layoutMedia$.pipe(
+      map((l) => {
+        switch (l.type) {
+          case "spotlight-landscape":
+          case "spotlight-portrait":
+            // If the spotlight is showing the active speaker, we can do without
+            // speaking indicators as they're a redundant visual cue. But if
+            // screen sharing feeds are in the spotlight we still need them.
+            return l.spotlight.some((m) => m.type === "screen share");
+          // In expanded spotlight layout, the active speaker is always shown in
+          // the picture-in-picture tile so there is no need for speaking
+          // indicators. And in one-on-one layout there's no question as to who is
+          // speaking.
+          case "spotlight-expanded":
+          case "one-on-one-landscape":
+          case "one-on-one-portrait":
+            return false;
+          default:
+            return true;
+        }
+      }),
+    ),
+  );
+
+  const toggleSpotlightExpanded$ = scope.behavior<(() => void) | null>(
+    windowMode$.pipe(
+      switchMap((mode) =>
+        mode === "normal"
+          ? layoutMedia$.pipe(
+              map(
+                (l) =>
+                  l.type === "spotlight-landscape" ||
+                  l.type === "spotlight-expanded",
+              ),
+            )
+          : of(false),
+      ),
+      distinctUntilChanged(),
+      map((enabled) =>
+        enabled ? (): void => spotlightExpandedToggle$.next() : null,
+      ),
+    ),
+  );
+
+  const edgeToEdge$ = scope.behavior<boolean>(
+    layoutMedia$.pipe(map(({ edgeToEdge }) => edgeToEdge)),
+  );
+
+  const screenTap$ = new Subject<void>();
+  const controlsTap$ = new Subject<void>();
+  const screenHover$ = new Subject<void>();
+  const screenUnhover$ = new Subject<void>();
+
+  const naturallyShowFooter$ = scope.behavior<boolean>(
+    edgeToEdge$.pipe(
+      switchMap((edgeToEdge) => {
+        if (!edgeToEdge) return of(true);
+
+        // Sadly Firefox has some layering glitches that prevent the footer
+        // from appearing properly. They happen less often if we never hide
+        // the footer.
+        if (isFirefox()) return of(true);
+
+        // Layout is edge-to-edge; show/hide the footer in response to interactions
+        return windowMode$.pipe(
+          switchMap((mode) => {
+            const showInitially = mode !== "flat";
+            const timeout$ = mode === "flat" ? timer(showFooterMs) : NEVER;
+
+            return merge(
+              screenTap$.pipe(map(() => "tap screen" as const)),
+              controlsTap$.pipe(map(() => "tap controls" as const)),
+              screenHover$.pipe(map(() => "hover" as const)),
+            ).pipe(
+              switchScan((state, interaction) => {
+                switch (interaction) {
+                  case "tap screen":
+                    return state
+                      ? // Toggle visibility on tap
+                        of(false)
+                      : // Hide after a timeout
+                        timeout$.pipe(
+                          map(() => false),
+                          startWith(true),
+                        );
+                  case "tap controls":
+                    // The user is interacting with things, so reset the timeout
+                    return timeout$.pipe(
+                      map(() => false),
+                      startWith(true),
+                    );
+                  case "hover":
+                    // Show on hover and hide after a timeout
+                    return race(timeout$, screenUnhover$.pipe(take(1))).pipe(
+                      map(() => false),
+                      startWith(true),
+                    );
+                }
+              }, showInitially),
+              startWith(showInitially),
+            );
+          }),
+        );
+      }),
+    ),
+  );
+
+  const urlParams = getUrlParams();
+  const showFooterUrlParams = !(
+    urlParams.header === HeaderStyle.None && urlParams.showControls === false
+  );
+  const showFooter$ = scope.behavior(
+    naturallyShowFooter$.pipe(
+      map((naturallyShowFooter) => naturallyShowFooter && showFooterUrlParams),
+    ),
+  );
+
+  const showHeader$ = scope.behavior<boolean>(
+    windowMode$.pipe(
+      switchMap((mode) => {
+        // In small windows the header would be too obstructive
+        if (mode === "pip" || mode === "flat") return of(false);
+        // In edge-to-edge layouts, couple the visibility of the header
+        // to that of the footer
+        return edgeToEdge$.pipe(
+          switchMap((edgeToEdge) => (edgeToEdge ? showFooter$ : of(true))),
+        );
+      }),
+    ),
+  );
+
+  /**
+   * The alignment of the floating spotlight tile, if present.
+   */
+  const spotlightAlignment$ = new BehaviorSubject<Alignment>({
+    inline: "end",
+    block: "end",
+  });
+  /**
+   * The size of the small picture-in-picture tile, if present, when in portrait.
+   */
+  const portraitPipSize$ = scope.behavior(
+    showFooter$.pipe(map((showFooter) => (showFooter ? "lg" : "sm"))),
+  );
+  /**
+   * The alignment of the small picture-in-picture tile, if present, when in portrait.
+   */
+  const portraitPipAlignment$ = new BehaviorSubject<Alignment>({
+    inline: "end",
+    block: "end",
+  });
+  /**
+   * The alignment of the small picture-in-picture tile, if present, when in landscape.
+   */
+  const landscapePipAlignment$ = new BehaviorSubject<Alignment>({
+    inline: "end",
+    block: "start",
+  });
 
   // There is a cyclical dependency here: the layout algorithms want to know
   // which tiles are on screen, but to know which tiles are on screen we have to
@@ -1256,19 +1434,33 @@ export function createCallViewModel$(
             case "spotlight-portrait":
               [layout, newTiles] = gridLikeLayout(
                 media,
+                spotlightAlignment$,
                 visibleTiles,
                 setVisibleTiles,
                 prevTiles,
               );
               break;
             case "spotlight-expanded":
-              [layout, newTiles] = spotlightExpandedLayout(media, prevTiles);
+              [layout, newTiles] = spotlightExpandedLayout(
+                media,
+                landscapePipAlignment$,
+                prevTiles,
+              );
               break;
             case "one-on-one-landscape":
-              [layout, newTiles] = oneOnOneLandscapeLayout(media, prevTiles);
+              [layout, newTiles] = oneOnOneLandscapeLayout(
+                media,
+                landscapePipAlignment$,
+                prevTiles,
+              );
               break;
             case "one-on-one-portrait":
-              [layout, newTiles] = oneOnOnePortraitLayout(media, prevTiles);
+              [layout, newTiles] = oneOnOnePortraitLayout(
+                media,
+                portraitPipSize$,
+                portraitPipAlignment$,
+                prevTiles,
+              );
               break;
             case "pip":
               [layout, newTiles] = pipLayout(media, prevTiles);
@@ -1296,131 +1488,6 @@ export function createCallViewModel$(
     layoutInternals$.pipe(map(({ tiles }) => tiles.generation)),
   );
 
-  const showSpotlightIndicators$ = scope.behavior<boolean>(
-    layout$.pipe(map((l) => l.type !== "grid")),
-  );
-
-  const showSpeakingIndicators$ = scope.behavior<boolean>(
-    layout$.pipe(
-      switchMap((l) => {
-        switch (l.type) {
-          case "spotlight-landscape":
-          case "spotlight-portrait":
-            // If the spotlight is showing the active speaker, we can do without
-            // speaking indicators as they're a redundant visual cue. But if
-            // screen sharing feeds are in the spotlight we still need them.
-            return l.spotlight.media$.pipe(
-              map((models: MediaViewModel[]) =>
-                models.some((m) => m.type === "screen share"),
-              ),
-            );
-          // In expanded spotlight layout, the active speaker is always shown in
-          // the picture-in-picture tile so there is no need for speaking
-          // indicators. And in one-on-one layout there's no question as to who is
-          // speaking.
-          case "spotlight-expanded":
-          case "one-on-one-landscape":
-          case "one-on-one-portrait":
-            return of(false);
-          default:
-            return of(true);
-        }
-      }),
-    ),
-  );
-
-  const toggleSpotlightExpanded$ = scope.behavior<(() => void) | null>(
-    windowMode$.pipe(
-      switchMap((mode) =>
-        mode === "normal"
-          ? layout$.pipe(
-              map(
-                (l) =>
-                  l.type === "spotlight-landscape" ||
-                  l.type === "spotlight-expanded",
-              ),
-            )
-          : of(false),
-      ),
-      distinctUntilChanged(),
-      map((enabled) =>
-        enabled ? (): void => spotlightExpandedToggle$.next() : null,
-      ),
-    ),
-  );
-
-  const screenTap$ = new Subject<void>();
-  const controlsTap$ = new Subject<void>();
-  const screenHover$ = new Subject<void>();
-  const screenUnhover$ = new Subject<void>();
-
-  const showHeader$ = scope.behavior<boolean>(
-    windowMode$.pipe(map((mode) => mode !== "pip" && mode !== "flat")),
-  );
-
-  const urlParams = getUrlParams();
-  const showFooterUrlParams = !(
-    urlParams.header === HeaderStyle.None && urlParams.showControls === false
-  );
-  const showFooterLayout$ = scope.behavior<boolean>(
-    windowMode$.pipe(
-      switchMap((mode) => {
-        switch (mode) {
-          case "pip":
-            return of(platform === "desktop" ? true : false);
-          case "normal":
-          case "narrow":
-            return of(true);
-          case "flat":
-            // Sadly Firefox has some layering glitches that prevent the footer
-            // from appearing properly. They happen less often if we never hide
-            // the footer.
-            if (isFirefox()) return of(true);
-            // Show/hide the footer in response to interactions
-            return merge(
-              screenTap$.pipe(map(() => "tap screen" as const)),
-              controlsTap$.pipe(map(() => "tap controls" as const)),
-              screenHover$.pipe(map(() => "hover" as const)),
-            ).pipe(
-              switchScan((state, interaction) => {
-                switch (interaction) {
-                  case "tap screen":
-                    return state
-                      ? // Toggle visibility on tap
-                        of(false)
-                      : // Hide after a timeout
-                        timer(showFooterMs).pipe(
-                          map(() => false),
-                          startWith(true),
-                        );
-                  case "tap controls":
-                    // The user is interacting with things, so reset the timeout
-                    return timer(showFooterMs).pipe(
-                      map(() => false),
-                      startWith(true),
-                    );
-                  case "hover":
-                    // Show on hover and hide after a timeout
-                    return race(
-                      timer(showFooterMs),
-                      screenUnhover$.pipe(take(1)),
-                    ).pipe(
-                      map(() => false),
-                      startWith(true),
-                    );
-                }
-              }, false),
-              startWith(false),
-            );
-        }
-      }),
-    ),
-  );
-  const showFooter$ = scope.behavior(
-    showFooterLayout$.pipe(
-      map((showFooter) => showFooter && showFooterUrlParams),
-    ),
-  );
   /**
    * Whether audio is currently being output through the earpiece.
    */
@@ -1624,7 +1691,6 @@ export function createCallViewModel$(
     audibleReactions$: audibleReactions$,
     visibleReactions$: visibleReactions$,
 
-    windowMode$: windowMode$,
     spotlightExpanded$: spotlightExpanded$,
     toggleSpotlightExpanded$: toggleSpotlightExpanded$,
     gridMode$: gridMode$,
@@ -1652,6 +1718,7 @@ export function createCallViewModel$(
     showSpeakingIndicators$: showSpeakingIndicators$,
     showHeader$: showHeader$,
     showFooter$: showFooter$,
+    edgeToEdge$,
     earpieceMode$: earpieceMode$,
     audioOutputSwitcher$: audioOutputSwitcher$,
     reconnecting$: localMembership.reconnecting$,

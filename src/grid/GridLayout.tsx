@@ -32,7 +32,6 @@ interface GridCSSProperties extends CSSProperties {
  */
 export const makeGridLayout: CallLayout<GridLayoutModel> = ({
   minBounds$,
-  spotlightAlignment$,
 }) => ({
   scrollingOnTop: false,
 
@@ -42,7 +41,7 @@ export const makeGridLayout: CallLayout<GridLayoutModel> = ({
     useUpdateLayout();
     const alignment = useObservableEagerState(
       useInitial(() =>
-        spotlightAlignment$.pipe(
+        model.spotlightAlignment$.pipe(
           distinctUntilChanged(
             (a1, a2) => a1.block === a2.block && a1.inline === a2.inline,
           ),
@@ -52,11 +51,11 @@ export const makeGridLayout: CallLayout<GridLayoutModel> = ({
 
     const onDragSpotlight: DragCallback = useCallback(
       ({ xRatio, yRatio }) =>
-        spotlightAlignment$.next({
+        model.spotlightAlignment$.next({
           block: yRatio < 0.5 ? "start" : "end",
           inline: xRatio < 0.5 ? "start" : "end",
         }),
-      [],
+      [model.spotlightAlignment$],
     );
 
     return (

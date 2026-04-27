@@ -23,6 +23,7 @@ export class GridTileViewModel {
       UserMediaViewModel | RingingMediaViewModel
     >,
     public readonly showNameTag$: Behavior<boolean>,
+    public readonly edgeToEdge$: Behavior<boolean>,
   ) {}
 }
 

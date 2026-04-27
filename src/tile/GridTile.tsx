@@ -62,6 +62,7 @@ interface TileProps {
   targetHeight: number;
   displayName: string;
   mxcAvatarUrl: string | undefined;
+  showNameTag: boolean;
   focusable: boolean;
 }
 
@@ -406,6 +407,7 @@ export const GridTile: FC<GridTileProps> = ({
   vm,
   showSpeakingIndicators,
   onOpenProfile,
+  className,
   ...props
 }) => {
   const ourRef = useRef<HTMLDivElement | null>(null);
@@ -413,26 +415,34 @@ export const GridTile: FC<GridTileProps> = ({
   const media = useBehavior(vm.media$);
   const displayName = useBehavior(media.displayName$);
   const mxcAvatarUrl = useBehavior(media.mxcAvatarUrl$);
+  const showNameTag = useBehavior(vm.showNameTag$);
+  const edgeToEdge = useBehavior(vm.edgeToEdge$);
+
+  const classes = classNames(className, { [styles.edgeToEdge]: edgeToEdge });
 
   if (media.type === "ringing") {
     return (
       <RingingMediaTile
         ref={ref}
+        className={classes}
         vm={media}
-        {...props}
         displayName={displayName}
         mxcAvatarUrl={mxcAvatarUrl}
+        showNameTag={showNameTag}
+        {...props}
       />
     );
   } else if (media.local) {
     return (
       <LocalUserMediaTile
         ref={ref}
+        className={classes}
         vm={media}
         showSpeakingIndicators={showSpeakingIndicators}
         onOpenProfile={onOpenProfile}
         displayName={displayName}
         mxcAvatarUrl={mxcAvatarUrl}
+        showNameTag={showNameTag}
         {...props}
       />
     );
@@ -440,10 +450,12 @@ export const GridTile: FC<GridTileProps> = ({
     return (
       <RemoteUserMediaTile
         ref={ref}
+        className={classes}
         vm={media}
         showSpeakingIndicators={showSpeakingIndicators}
         displayName={displayName}
         mxcAvatarUrl={mxcAvatarUrl}
+        showNameTag={showNameTag}
         {...props}
       />
     );

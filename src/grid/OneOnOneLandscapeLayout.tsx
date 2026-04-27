@@ -23,7 +23,7 @@ import { useBehavior } from "../useBehavior";
  */
 export const makeOneOnOneLandscapeLayout: CallLayout<
   OneOnOneLandscapeLayoutModel
-> = ({ minBounds$, landscapePipAlignment$ }) => ({
+> = ({ minBounds$ }) => ({
   scrollingOnTop: false,
 
   fixed: function OneOnOneLandscapeLayoutFixed({ ref }): ReactNode {
@@ -38,7 +38,7 @@ export const makeOneOnOneLandscapeLayout: CallLayout<
   }): ReactNode {
     useUpdateLayout();
     const { width, height } = useObservableEagerState(minBounds$);
-    const pipAlignmentValue = useBehavior(landscapePipAlignment$);
+    const pipAlignment = useBehavior(model.pipAlignment$);
     const { tileWidth, tileHeight } = useMemo(
       () => arrangeTiles(width, height, 1),
       [width, height],
@@ -46,11 +46,11 @@ export const makeOneOnOneLandscapeLayout: CallLayout<
 
     const onDragLocalTile: DragCallback = useCallback(
       ({ xRatio, yRatio }) =>
-        landscapePipAlignment$.next({
+        model.pipAlignment$.next({
           block: yRatio < 0.5 ? "start" : "end",
           inline: xRatio < 0.5 ? "start" : "end",
         }),
-      [],
+      [model.pipAlignment$],
     );
 
     return (
@@ -66,8 +66,8 @@ export const makeOneOnOneLandscapeLayout: CallLayout<
             id={model.pip.id}
             model={model.pip}
             onDrag={onDragLocalTile}
-            data-block-alignment={pipAlignmentValue.block}
-            data-inline-alignment={pipAlignmentValue.inline}
+            data-block-alignment={pipAlignment.block}
+            data-inline-alignment={pipAlignment.inline}
           />
         </Slot>
       </div>

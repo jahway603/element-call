@@ -1,5 +1,5 @@
 /*
-Copyright 2024 New Vector Ltd.
+Copyright 2026 Element Creations Ltd.
 
 SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE in the repository root for full details.
@@ -7,39 +7,40 @@ Please see LICENSE in the repository root for full details.
 
 .layer {
   block-size: 100%;
-  display: grid;
-  place-items: center;
-}
-
-.container {
-  position: relative;
-}
-
-.local {
-  position: absolute;
-  inline-size: 180px;
-  block-size: 135px;
-  inset: 0;
 }
 
 .spotlight {
-  position: absolute;
-  inline-size: 404px;
-  block-size: 233px;
+  block-size: 100%;
+  inline-size: 100%;
 }
 
-.slot[data-block-alignment="start"] {
+.pip {
+  position: absolute;
+  inset: var(--cpd-space-4x);
+}
+
+.pip[data-size="sm"] {
+  inline-size: 88px;
+  block-size: 132px;
+}
+
+.pip[data-size="lg"] {
+  inline-size: 140px;
+  block-size: 210px;
+}
+
+.pip[data-block-alignment="start"] {
   inset-block-end: unset;
 }
 
-.slot[data-block-alignment="end"] {
+.pip[data-block-alignment="end"] {
   inset-block-start: unset;
 }
 
-.slot[data-inline-alignment="start"] {
+.pip[data-inline-alignment="start"] {
   inset-inline-end: unset;
 }
 
-.slot[data-inline-alignment="end"] {
+.pip[data-inline-alignment="end"] {
   inset-inline-start: unset;
 }

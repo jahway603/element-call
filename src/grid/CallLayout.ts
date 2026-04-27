@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE in the repository root for full details.
 */
 
-import { type BehaviorSubject, type Observable } from "rxjs";
+import { type Observable } from "rxjs";
 import { type ComponentType } from "react";
 
 import { type LayoutProps } from "./Grid";
@@ -16,41 +16,11 @@ export interface Bounds {
   height: number;
 }
 
-export interface Alignment {
-  inline: "start" | "end";
-  block: "start" | "end";
-}
-
-export const defaultSpotlightAlignment: Alignment = {
-  inline: "end",
-  block: "end",
-};
-export const defaultPortraitPipAlignment: Alignment = {
-  inline: "end",
-  block: "end",
-};
-export const defaultLandscapePipAlignment: Alignment = {
-  inline: "end",
-  block: "start",
-};
-
 export interface CallLayoutInputs {
   /**
    * The minimum bounds of the layout area.
    */
   minBounds$: Observable<Bounds>;
-  /**
-   * The alignment of the floating spotlight tile, if present.
-   */
-  spotlightAlignment$: BehaviorSubject<Alignment>;
-  /**
-   * The alignment of the small picture-in-picture tile, if present, when in portrait.
-   */
-  portraitPipAlignment$: BehaviorSubject<Alignment>;
-  /**
-   * The alignment of the small picture-in-picture tile, if present, when in landscape.
-   */
-  landscapePipAlignment$: BehaviorSubject<Alignment>;
 }
 
 export interface CallLayoutOutputs<Model> {

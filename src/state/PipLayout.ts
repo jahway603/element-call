@@ -26,6 +26,7 @@ export function pipLayout(
   return [
     {
       type: media.type,
+      foreground: "fixed",
       spotlight: tiles.spotlightTile!,
     },
     tiles,

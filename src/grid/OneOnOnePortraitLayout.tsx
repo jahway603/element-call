@@ -6,12 +6,11 @@ SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE in the repository root for full details.
 */
 
-import { type ReactNode, useCallback, useMemo } from "react";
-import { useObservableEagerState } from "observable-hooks";
+import { type ReactNode, useCallback } from "react";
 import classNames from "classnames";
 
 import { type OneOnOnePortraitLayout as OneOnOnePortraitLayoutModel } from "../state/layout-types.ts";
-import { type CallLayout, arrangeTiles } from "./CallLayout";
+import { type CallLayout } from "./CallLayout";
 import styles from "./OneOnOnePortraitLayout.module.css";
 import { type DragCallback, useUpdateLayout } from "./Grid";
 import { useBehavior } from "../useBehavior";
@@ -23,12 +22,20 @@ import { useBehavior } from "../useBehavior";
  */
 export const makeOneOnOnePortraitLayout: CallLayout<
   OneOnOnePortraitLayoutModel
-> = ({ minBounds$, portraitPipAlignment$ }) => ({
+> = () => ({
   scrollingOnTop: false,
 
-  fixed: function OneOnOnePortraitLayoutFixed({ ref }): ReactNode {
+  fixed: function OneOnOnePortraitLayoutFixed({ ref, model, Slot }): ReactNode {
     useUpdateLayout();
-    return <div ref={ref} />;
+    return (
+      <div ref={ref} className={styles.layer}>
+        <Slot
+          className={styles.spotlight}
+          id={model.spotlight.id}
+          model={model.spotlight}
+        />
+      </div>
+    );
   },
 
   scrolling: function OneOnOnePortraitLayoutScrolling({
@@ -37,41 +44,30 @@ export const makeOneOnOnePortraitLayout: CallLayout<
     Slot,
   }): ReactNode {
     useUpdateLayout();
-    const { width, height } = useObservableEagerState(minBounds$);
-    const pipAlignmentValue = useBehavior(portraitPipAlignment$);
-    const { tileWidth, tileHeight } = useMemo(
-      () => arrangeTiles(width, height, 1),
-      [width, height],
-    );
-
+    const pipSize = useBehavior(model.pipSize$);
+    const pipAlignment = useBehavior(model.pipAlignment$);
     const onDragLocalTile: DragCallback = useCallback(
       ({ xRatio, yRatio }) =>
-        portraitPipAlignment$.next({
+        model.pipAlignment$.next({
           block: yRatio < 0.5 ? "start" : "end",
           inline: xRatio < 0.5 ? "start" : "end",
         }),
-      [],
+      [model.pipAlignment$],
     );
 
     return (
       <div ref={ref} className={styles.layer}>
-        <Slot
-          id={model.spotlight.id}
-          model={model.spotlight}
-          className={styles.container}
-          style={{ width: tileWidth, height: tileHeight }}
-        >
-          {model.pip && (
-            <Slot
-              className={classNames(styles.slot, styles.local)}
-              id={model.pip.id}
-              model={model.pip}
-              onDrag={onDragLocalTile}
-              data-block-alignment={pipAlignmentValue.block}
-              data-inline-alignment={pipAlignmentValue.inline}
-            />
-          )}
-        </Slot>
+        {model.pip && (
+          <Slot
+            className={classNames(styles.pip)}
+            id={model.pip.id}
+            model={model.pip}
+            onDrag={onDragLocalTile}
+            data-size={pipSize}
+            data-block-alignment={pipAlignment.block}
+            data-inline-alignment={pipAlignment.inline}
+          />
+        )}
       </div>
     );
   },

@@ -59,11 +59,37 @@ class GridTileData {
     this.media$.next(value);
   }
 
+  private readonly showNameTag$: BehaviorSubject<boolean>;
+  public get showNameTag(): boolean {
+    return this.showNameTag$.value;
+  }
+  public set showNameTag(value: boolean) {
+    this.showNameTag$.next(value);
+  }
+
+  private readonly edgeToEdge$: BehaviorSubject<boolean>;
+  public get edgeToEdge(): boolean {
+    return this.edgeToEdge$.value;
+  }
+  public set edgeToEdge(value: boolean) {
+    this.edgeToEdge$.next(value);
+  }
+
   public readonly vm: GridTileViewModel;
 
-  public constructor(media: UserMediaViewModel | RingingMediaViewModel) {
+  public constructor(
+    media: UserMediaViewModel | RingingMediaViewModel,
+    showNameTag: boolean,
+    edgeToEdge: boolean,
+  ) {
     this.media$ = new BehaviorSubject(media);
-    this.vm = new GridTileViewModel(this.media$);
+    this.showNameTag$ = new BehaviorSubject(showNameTag);
+    this.edgeToEdge$ = new BehaviorSubject(edgeToEdge);
+    this.vm = new GridTileViewModel(
+      this.media$,
+      this.showNameTag$,
+      this.edgeToEdge$,
+    );
   }
 }
 
@@ -183,6 +209,8 @@ export class TileStoreBuilder {
    */
   public registerGridTile(
     media: UserMediaViewModel | RingingMediaViewModel,
+    showNameTag = true,
+    edgeToEdge = false,
   ): void {
     if (DEBUG_ENABLED)
       logger.debug(
@@ -220,6 +248,8 @@ export class TileStoreBuilder {
             this.stationaryGridEntries[prevIndex] = entry;
             // Do the media swap
             entry.media = media;
+            entry.showNameTag = showNameTag;
+            entry.edgeToEdge = edgeToEdge;
             this.prevGridByMedia.delete(this.spotlight.media[0]);
             this.prevGridByMedia.set(media, prev);
           } else {
@@ -228,7 +258,7 @@ export class TileStoreBuilder {
             (nowVisible
               ? this.visibleGridEntries
               : this.invisibleGridEntries
-            ).push(new GridTileData(media));
+            ).push(new GridTileData(media, showNameTag, edgeToEdge));
           }
 
           this.numGridEntries++;
@@ -244,10 +274,12 @@ export class TileStoreBuilder {
       (this.numGridEntries < this.visibleTiles
         ? this.visibleGridEntries
         : this.invisibleGridEntries
-      ).push(new GridTileData(media));
+      ).push(new GridTileData(media, showNameTag, edgeToEdge));
     } else {
       // Reuse the existing tile
       const [entry, prevIndex] = prev;
+      entry.showNameTag = showNameTag;
+      entry.edgeToEdge = edgeToEdge;
       const previouslyVisible = prevIndex < this.visibleTiles;
       const nowVisible = this.numGridEntries < this.visibleTiles;
       // If it doesn't need to move between the visible/invisible sections of
@@ -270,7 +302,7 @@ export class TileStoreBuilder {
    * method will more eagerly try to reuse an existing tile, replacing its
    * media, than registerGridTile would.
    */
-  public registerPipTile(media: UserMediaViewModel): void {
+  public registerPipTile(media: UserMediaViewModel, showNameTag = true): void {
     if (DEBUG_ENABLED)
       logger.debug(
         `[TileStore, ${this.generation}] register PiP tile: ${media.displayName$.value}`,
@@ -282,10 +314,12 @@ export class TileStoreBuilder {
       this.stationaryGridEntries[0] = entry;
       // Do the media swap
       entry.media = media;
+      entry.showNameTag = showNameTag;
+      entry.edgeToEdge = false;
       this.prevGridByMedia.delete(entry.media);
       this.prevGridByMedia.set(media, [entry, 0]);
     } else {
-      this.visibleGridEntries.push(new GridTileData(media));
+      this.visibleGridEntries.push(new GridTileData(media, showNameTag, false));
     }
 
     this.numGridEntries++;
