@@ -803,7 +803,11 @@ export function enterRTCSession(
       membershipEventExpiryMs:
         matrixRtcSessionConfig?.membership_event_expiry_ms,
       unstableSendStickyEvents: matrixRTCMode === MatrixRTCMode.Matrix_2_0,
-      maximumNetworkErrorRetryCount: 60,
+      maximumNetworkErrorRetryCount:
+        Math.ceil(
+          (Config.get().sync_disconnect_grace_period_ms ?? 10000) /
+            (matrixRtcSessionConfig?.network_error_retry_ms ?? 1000),
+        ) + 1,
     },
   );
 }
